@@ -3,354 +3,232 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>External PFC</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="PFC">
+<meta name="mobile-web-app-capable" content="yes">
+<title>External PFC v2</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #111;
-    color: #fff;
-    font-family: -apple-system, sans-serif;
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-  }
-  #video-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
-  video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-  }
-  canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-    transform: scaleX(-1);
-    pointer-events: none;
-  }
-  #alert-border {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    border: 0px solid red;
-    pointer-events: none;
-    z-index: 100;
-    transition: border-width 0.05s;
-  }
-  #alert-border.active {
-    border-width: 30px;
-    animation: pulse 0.3s ease-in-out;
-  }
-  @keyframes pulse {
-    0% { border-color: red; }
-    50% { border-color: #ff4444; }
-    100% { border-color: red; }
-  }
-  #hud {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.7);
-    border-radius: 16px;
-    padding: 12px 24px;
-    display: flex;
-    gap: 24px;
-    align-items: center;
-    z-index: 50;
-    backdrop-filter: blur(10px);
-    font-size: 16px;
-  }
+  body { background: #111; color: #fff; font-family: -apple-system, sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+  #video-container { position: relative; width: 100%; height: 100%; }
+  video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); pointer-events: none; }
+  #alert-border { position: fixed; top: 0; left: 0; right: 0; bottom: 0; border: 0px solid red; pointer-events: none; z-index: 100; transition: border-width 0.05s; }
+  #alert-border.active { border-width: 30px; animation: pulse 0.3s ease-in-out; }
+  @keyframes pulse { 0% { border-color: red; } 50% { border-color: #ff4444; } 100% { border-color: red; } }
+  #hud { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); border-radius: 16px; padding: 12px 24px; display: flex; gap: 24px; align-items: center; z-index: 50; backdrop-filter: blur(10px); font-size: 16px; }
   #hud .stat { text-align: center; }
   #hud .stat .value { font-size: 28px; font-weight: bold; }
   #hud .stat .label { font-size: 11px; opacity: 0.6; }
-  #status {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.7);
-    border-radius: 12px;
-    padding: 8px 20px;
-    z-index: 50;
-    backdrop-filter: blur(10px);
-    font-size: 14px;
-  }
+  #status { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); border-radius: 12px; padding: 8px 20px; z-index: 50; backdrop-filter: blur(10px); font-size: 14px; }
   #status.ok { border: 1px solid #4f4; }
   #status.warn { border: 1px solid #f44; }
   #status.loading { border: 1px solid #ff4; }
-  #start-screen {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #111;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-  }
+  #start-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
   #start-screen h1 { font-size: 32px; margin-bottom: 8px; }
   #start-screen p { opacity: 0.6; margin-bottom: 30px; font-size: 16px; }
-  #start-btn {
-    background: #e33;
-    color: white;
-    border: none;
-    border-radius: 14px;
-    padding: 16px 48px;
-    font-size: 20px;
-    font-weight: bold;
-    cursor: pointer;
-  }
+  #start-btn { background: #e33; color: white; border: none; border-radius: 14px; padding: 16px 48px; font-size: 20px; font-weight: bold; cursor: pointer; }
   #start-btn:active { background: #c22; }
 </style>
 </head>
 <body>
-
 <div id="start-screen">
-  <h1>External PFC</h1>
-  <p>ניטור נגיעה בשיער בלבד</p>
+  <h1>External PFC v2</h1>
+  <p>ניטור נגיעה בשיער - מקו השיער ומעלה</p>
   <button id="start-btn">התחל</button>
 </div>
-
 <div id="video-container" style="display:none">
   <video id="video" playsinline></video>
   <canvas id="canvas"></canvas>
 </div>
-
 <div id="alert-border"></div>
-
-<div id="status" class="loading" style="display:none">
-  <span id="status-text">טוען מודל...</span>
-</div>
-
+<div id="status" class="loading" style="display:none"><span id="status-text">טוען מודל...</span></div>
 <div id="hud" style="display:none">
-  <div class="stat">
-    <div class="value" id="alert-count">0</div>
-    <div class="label">התראות</div>
-  </div>
-  <div class="stat">
-    <div class="value" id="session-time">00:00</div>
-    <div class="label">זמן</div>
-  </div>
-  <div class="stat">
-    <div class="value" id="distance">-</div>
-    <div class="label">מרחק</div>
-  </div>
+  <div class="stat"><div class="value" id="alert-count">0</div><div class="label">התראות</div></div>
+  <div class="stat"><div class="value" id="session-time">00:00</div><div class="label">זמן</div></div>
+  <div class="stat"><div class="value" id="distance">-</div><div class="label">מרחק</div></div>
 </div>
-
 <script type="module">
 import { Hands } from "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js";
 import { FaceMesh } from "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js";
 
-// --- Hair zone detection config ---
-const HAIR_THRESHOLD = 0.12;
-const COOLDOWN_MS = 800;
-const HISTORY_SIZE = 5;
+const HAIR_THRESHOLD = 0.13, COOLDOWN_MS = 800, HISTORY_SIZE = 5, Z_WEIGHT = 0.5;
+const HAIR_ZONE = [10, 151, 70, 300, 234, 454, 21, 251, 71, 301, 109, 338];
+const MOUTH_ZONE = [13, 14, 0, 152, 17, 61, 291];
+const EYE_TOP = [159, 386];
+const TIPS = [4, 8, 12, 16, 20], MCPS = [2, 5, 9, 13, 17], PIPS = [3, 6, 10, 14, 18];
 
-// Face landmarks
-const HAIR_ZONE = [10, 151, 70, 300, 234, 454, 21, 251];
-const MOUTH_ZONE = [13, 14, 0, 152];
-const FINGERTIPS = [4, 8, 12, 16, 20];
-
-let alertCount = 0;
-let lastAlertTime = 0;
-let distHistory = [];
-let sessionStart = 0;
-let logData = [];
-
-let handResults = null;
-let faceResults = null;
+let alertCount = 0, lastAlertTime = 0, distHistory = [], poseHistory = [], sessionStart = 0, logData = [];
+let handResults = null, faceResults = null;
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function beep() {
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.frequency.value = 660;
-  gain.gain.value = 0.3;
-  osc.start();
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.frequency.value = 660; gain.gain.value = 0.3; osc.start();
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
   osc.stop(audioCtx.currentTime + 0.15);
 }
-
 function showAlert() {
-  const border = document.getElementById("alert-border");
-  border.classList.add("active");
-  setTimeout(() => border.classList.remove("active"), 300);
-  beep();
-  alertCount++;
+  const b = document.getElementById("alert-border");
+  b.classList.add("active"); setTimeout(() => b.classList.remove("active"), 300);
+  beep(); alertCount++;
   document.getElementById("alert-count").textContent = alertCount;
 }
-
 function updateTimer() {
-  const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-  const m = String(Math.floor(elapsed / 60)).padStart(2, "0");
-  const s = String(elapsed % 60).padStart(2, "0");
-  document.getElementById("session-time").textContent = `${m}:${s}`;
+  const e = Math.floor((Date.now() - sessionStart) / 1000);
+  document.getElementById("session-time").textContent =
+    String(Math.floor(e/60)).padStart(2,"0") + ":" + String(e%60).padStart(2,"0");
 }
-
-function distToZone(finger, faceLms, zoneIds) {
+function dist3d(a, b) {
+  return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (Z_WEIGHT*(a.z-b.z))**2);
+}
+function minDistToZone(finger, faceLms, ids) {
+  let m = 999;
+  for (const id of ids) { const d = dist3d(finger, faceLms[id]); if (d < m) m = d; }
+  return m;
+}
+function isPinchPose(handLms) {
+  const tips = TIPS.map(i => handLms[i]), mcps = MCPS.map(i => handLms[i]), pips = PIPS.map(i => handLms[i]);
+  let curled = 0;
+  for (let i = 1; i < 5; i++) { if (dist3d(tips[i], mcps[i]) < dist3d(pips[i], mcps[i]) * 1.2) curled++; }
+  return Math.max(dist3d(tips[0], tips[1]) < 0.06 ? 1 : 0, curled / 4);
+}
+function isHairTouch(handLms, faceLms) {
+  const eyeY = (faceLms[EYE_TOP[0]].y + faceLms[EYE_TOP[1]].y) / 2;
+  const hairLine = faceLms[10].y + (faceLms[151].y - faceLms[10].y) * 0.4;
   let minD = 999;
-  for (const id of zoneIds) {
-    const lm = faceLms[id];
-    const d = Math.sqrt((finger.x - lm.x) ** 2 + (finger.y - lm.y) ** 2);
-    if (d < minD) minD = d;
+  for (const tip of TIPS) {
+    const f = handLms[tip];
+    const hd = minDistToZone(f, faceLms, HAIR_ZONE);
+    const md = minDistToZone(f, faceLms, MOUTH_ZONE);
+    if (hd < minD) minD = hd;
+    if (hd >= HAIR_THRESHOLD) continue;
+    const aboveHairline = f.y < hairLine;
+    const atTemples = f.y < eyeY && (f.x < faceLms[234].x || f.x > faceLms[454].x);
+    if (!aboveHairline && !atTemples) continue;
+    if (md < hd * 1.2) continue;
+    return { triggered: true, dist: minD };
   }
-  return minD;
+  return { triggered: false, dist: minD };
 }
 
-function isHandInHairZone(handLms, faceLms) {
-  let minHairDist = 999;
-  for (const tipId of FINGERTIPS) {
-    const finger = handLms[tipId];
-    const hairDist = distToZone(finger, faceLms, HAIR_ZONE);
-    const mouthDist = distToZone(finger, faceLms, MOUTH_ZONE);
-    if (hairDist < minHairDist) minHairDist = hairDist;
-    // Close to hair AND far from mouth = hair touching
-    if (hairDist < HAIR_THRESHOLD && mouthDist > hairDist * 1.3) {
-      return { triggered: true, dist: minHairDist };
-    }
-  }
-  return { triggered: false, dist: minHairDist };
-}
-
-const hands = new Hands({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`
-});
-hands.setOptions({
-  maxNumHands: 2,
-  modelComplexity: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.5
-});
+const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}` });
+hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
 hands.onResults(r => { handResults = r; });
-
-const faceMesh = new FaceMesh({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}`
-});
-faceMesh.setOptions({
-  maxNumFaces: 1,
-  refineLandmarks: false,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.5
-});
+const faceMesh = new FaceMesh({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}` });
+faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
 faceMesh.onResults(r => { faceResults = r; });
 
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const statusEl = document.getElementById("status");
-const statusText = document.getElementById("status-text");
-const distEl = document.getElementById("distance");
+const video = document.getElementById("video"), canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d"), statusEl = document.getElementById("status");
+const statusText = document.getElementById("status-text"), distEl = document.getElementById("distance");
 
 async function start() {
   document.getElementById("start-screen").style.display = "none";
   document.getElementById("video-container").style.display = "block";
   statusEl.style.display = "block";
   document.getElementById("hud").style.display = "flex";
-
   if (audioCtx.state === "suspended") audioCtx.resume();
   statusText.textContent = "טוען מודלים...";
-
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
-  });
-  video.srcObject = stream;
-  await video.play();
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  sessionStart = Date.now();
-  setInterval(updateTimer, 1000);
-
-  statusText.textContent = "פעיל";
-  statusEl.className = "ok";
-  processFrame();
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+  video.srcObject = stream; await video.play();
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  sessionStart = Date.now(); setInterval(updateTimer, 1000);
+  statusText.textContent = "פעיל"; statusEl.className = "ok"; processFrame();
 }
 
 let frameToggle = false;
-
 async function processFrame() {
   frameToggle = !frameToggle;
-  if (frameToggle) {
-    await hands.send({ image: video });
-  } else {
-    await faceMesh.send({ image: video });
-  }
+  if (frameToggle) await hands.send({ image: video }); else await faceMesh.send({ image: video });
 
   if (handResults?.multiHandLandmarks?.length && faceResults?.multiFaceLandmarks?.length) {
     const faceLms = faceResults.multiFaceLandmarks[0];
-    let triggered = false;
-    let bestDist = 999;
-
+    let triggered = false, bestDist = 999;
     for (const handLms of handResults.multiHandLandmarks) {
-      const result = isHandInHairZone(handLms, faceLms);
-      if (result.dist < bestDist) bestDist = result.dist;
-      if (result.triggered) triggered = true;
+      const r = isHairTouch(handLms, faceLms);
+      if (r.dist < bestDist) bestDist = r.dist;
+      if (r.triggered) {
+        const ps = isPinchPose(handLms);
+        poseHistory.push(ps); if (poseHistory.length > HISTORY_SIZE) poseHistory.shift();
+        const avg = poseHistory.reduce((a,b) => a+b, 0) / poseHistory.length;
+        if (avg > 0.2 || r.dist < HAIR_THRESHOLD * 0.7) triggered = true;
+      }
     }
-
-    distHistory.push(bestDist);
-    if (distHistory.length > HISTORY_SIZE) distHistory.shift();
-    const smoothDist = distHistory.reduce((a, b) => a + b, 0) / distHistory.length;
-
-    distEl.textContent = smoothDist.toFixed(2);
-
+    distHistory.push(bestDist); if (distHistory.length > HISTORY_SIZE) distHistory.shift();
+    const smooth = distHistory.reduce((a,b) => a+b, 0) / distHistory.length;
+    distEl.textContent = smooth.toFixed(2);
     const now = Date.now();
-    if (triggered && smoothDist < HAIR_THRESHOLD && (now - lastAlertTime) > COOLDOWN_MS) {
-      showAlert();
-      lastAlertTime = now;
-
+    if (triggered && smooth < HAIR_THRESHOLD && (now - lastAlertTime) > COOLDOWN_MS) {
+      showAlert(); lastAlertTime = now;
       const d = new Date();
-      logData.push({
-        time: d.toISOString(),
-        date: d.toLocaleDateString("he-IL"),
-        hour: d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
-        dist: bestDist.toFixed(4),
-        smooth: smoothDist.toFixed(4)
-      });
-
-      statusText.textContent = `התראה #${alertCount}`;
-      statusEl.className = "warn";
-      setTimeout(() => {
-        statusText.textContent = "פעיל";
-        statusEl.className = "ok";
-      }, 1000);
+      logData.push({ time: d.toISOString(), date: d.toLocaleDateString("he-IL"),
+        hour: d.toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"}),
+        dist: bestDist.toFixed(4), smooth: smooth.toFixed(4) });
+      statusText.textContent = `התראה #${alertCount}`; statusEl.className = "warn";
+      setTimeout(() => { statusText.textContent = "פעיל"; statusEl.className = "ok"; }, 1000);
     }
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   } else {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    distEl.textContent = "-";
-    distHistory.length = 0;
+    distEl.textContent = "-"; distHistory.length = 0; poseHistory.length = 0;
   }
-
   requestAnimationFrame(processFrame);
 }
 
-// Download log
 window.downloadLog = function() {
-  if (!logData.length) { alert("אין נתונים עדיין"); return; }
+  if (!logData.length) { alert("אין נתונים"); return; }
   let csv = "timestamp,date,hour,distance,smoothed\n";
-  logData.forEach(r => {
-    csv += `${r.time},${r.date},${r.hour},${r.dist},${r.smooth}\n`;
-  });
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `pfc_log_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  logData.forEach(r => { csv += `${r.time},${r.date},${r.hour},${r.dist},${r.smooth}\n`; });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download = `pfc_log_${new Date().toISOString().slice(0,10)}.csv`; a.click();
 };
-
 document.getElementById("start-btn").addEventListener("click", start);
 document.getElementById("hud").addEventListener("dblclick", () => window.downloadLog());
+
+// --- Keep Alive: מונע מהמסך להיכבות ---
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => {
+        // מנסה לתפוס מחדש אם שוחרר
+        setTimeout(requestWakeLock, 1000);
+      });
+    }
+  } catch(e) {}
+}
+
+// כשחוזרים לאפליקציה אחרי שהייתה ברקע - מפעיל מחדש
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible') {
+    await requestWakeLock();
+    // אם המצלמה נסגרה, מפעיל מחדש
+    if (video.srcObject) {
+      const tracks = video.srcObject.getTracks();
+      const allLive = tracks.every(t => t.readyState === 'live');
+      if (!allLive) {
+        // מצלמה מתה, restart
+        tracks.forEach(t => t.stop());
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+        video.srcObject = stream;
+        await video.play();
+      }
+    }
+  }
+});
+
+// מפעיל Wake Lock אחרי start
+const origStart = start;
+start = async function() {
+  await origStart();
+  await requestWakeLock();
+};
 </script>
 </body>
 </html>
