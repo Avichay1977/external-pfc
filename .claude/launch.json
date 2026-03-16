@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pfc-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["-e", "require('http').createServer((q,r)=>{require('fs').readFile('C:/Users/USER/projects/external-pfc/pfc_ipad.html',(e,d)=>{r.writeHead(200,{'Content-Type':'text/html'});r.end(d)})}).listen(8080)"],
+      "port": 8080
+    }
+  ]
+}

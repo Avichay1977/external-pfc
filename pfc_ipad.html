@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>External PFC</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    color: #fff;
+    font-family: -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  #video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+  }
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1);
+    pointer-events: none;
+  }
+  #alert-border {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border: 0px solid red;
+    pointer-events: none;
+    z-index: 100;
+    transition: border-width 0.05s;
+  }
+  #alert-border.active {
+    border-width: 30px;
+    animation: pulse 0.3s ease-in-out;
+  }
+  @keyframes pulse {
+    0% { border-color: red; }
+    50% { border-color: #ff4444; }
+    100% { border-color: red; }
+  }
+  #hud {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    border-radius: 16px;
+    padding: 12px 24px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    z-index: 50;
+    backdrop-filter: blur(10px);
+    font-size: 16px;
+  }
+  #hud .stat { text-align: center; }
+  #hud .stat .value { font-size: 28px; font-weight: bold; }
+  #hud .stat .label { font-size: 11px; opacity: 0.6; }
+  #status {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    border-radius: 12px;
+    padding: 8px 20px;
+    z-index: 50;
+    backdrop-filter: blur(10px);
+    font-size: 14px;
+  }
+  #status.ok { border: 1px solid #4f4; }
+  #status.warn { border: 1px solid #f44; }
+  #status.loading { border: 1px solid #ff4; }
+  #start-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  #start-screen h1 { font-size: 32px; margin-bottom: 8px; }
+  #start-screen p { opacity: 0.6; margin-bottom: 30px; font-size: 16px; }
+  #start-btn {
+    background: #e33;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 16px 48px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  #start-btn:active { background: #c22; }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>External PFC</h1>
+  <p>ניטור נגיעה בשיער בלבד</p>
+  <button id="start-btn">התחל</button>
+</div>
+
+<div id="video-container" style="display:none">
+  <video id="video" playsinline></video>
+  <canvas id="canvas"></canvas>
+</div>
+
+<div id="alert-border"></div>
+
+<div id="status" class="loading" style="display:none">
+  <span id="status-text">טוען מודל...</span>
+</div>
+
+<div id="hud" style="display:none">
+  <div class="stat">
+    <div class="value" id="alert-count">0</div>
+    <div class="label">התראות</div>
+  </div>
+  <div class="stat">
+    <div class="value" id="session-time">00:00</div>
+    <div class="label">זמן</div>
+  </div>
+  <div class="stat">
+    <div class="value" id="distance">-</div>
+    <div class="label">מרחק</div>
+  </div>
+</div>
+
+<script type="module">
+import { Hands } from "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js";
+import { FaceMesh } from "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js";
+
+// --- Hair zone detection config ---
+const HAIR_THRESHOLD = 0.12;
+const COOLDOWN_MS = 800;
+const HISTORY_SIZE = 5;
+
+// Face landmarks
+const HAIR_ZONE = [10, 151, 70, 300, 234, 454, 21, 251];
+const MOUTH_ZONE = [13, 14, 0, 152];
+const FINGERTIPS = [4, 8, 12, 16, 20];
+
+let alertCount = 0;
+let lastAlertTime = 0;
+let distHistory = [];
+let sessionStart = 0;
+let logData = [];
+
+let handResults = null;
+let faceResults = null;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function beep() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.frequency.value = 660;
+  gain.gain.value = 0.3;
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function showAlert() {
+  const border = document.getElementById("alert-border");
+  border.classList.add("active");
+  setTimeout(() => border.classList.remove("active"), 300);
+  beep();
+  alertCount++;
+  document.getElementById("alert-count").textContent = alertCount;
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+  const m = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const s = String(elapsed % 60).padStart(2, "0");
+  document.getElementById("session-time").textContent = `${m}:${s}`;
+}
+
+function distToZone(finger, faceLms, zoneIds) {
+  let minD = 999;
+  for (const id of zoneIds) {
+    const lm = faceLms[id];
+    const d = Math.sqrt((finger.x - lm.x) ** 2 + (finger.y - lm.y) ** 2);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
+function isHandInHairZone(handLms, faceLms) {
+  let minHairDist = 999;
+  for (const tipId of FINGERTIPS) {
+    const finger = handLms[tipId];
+    const hairDist = distToZone(finger, faceLms, HAIR_ZONE);
+    const mouthDist = distToZone(finger, faceLms, MOUTH_ZONE);
+    if (hairDist < minHairDist) minHairDist = hairDist;
+    // Close to hair AND far from mouth = hair touching
+    if (hairDist < HAIR_THRESHOLD && mouthDist > hairDist * 1.3) {
+      return { triggered: true, dist: minHairDist };
+    }
+  }
+  return { triggered: false, dist: minHairDist };
+}
+
+const hands = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`
+});
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.5
+});
+hands.onResults(r => { handResults = r; });
+
+const faceMesh = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}`
+});
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: false,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.5
+});
+faceMesh.onResults(r => { faceResults = r; });
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const statusText = document.getElementById("status-text");
+const distEl = document.getElementById("distance");
+
+async function start() {
+  document.getElementById("start-screen").style.display = "none";
+  document.getElementById("video-container").style.display = "block";
+  statusEl.style.display = "block";
+  document.getElementById("hud").style.display = "flex";
+
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  statusText.textContent = "טוען מודלים...";
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+  });
+  video.srcObject = stream;
+  await video.play();
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  sessionStart = Date.now();
+  setInterval(updateTimer, 1000);
+
+  statusText.textContent = "פעיל";
+  statusEl.className = "ok";
+  processFrame();
+}
+
+let frameToggle = false;
+
+async function processFrame() {
+  frameToggle = !frameToggle;
+  if (frameToggle) {
+    await hands.send({ image: video });
+  } else {
+    await faceMesh.send({ image: video });
+  }
+
+  if (handResults?.multiHandLandmarks?.length && faceResults?.multiFaceLandmarks?.length) {
+    const faceLms = faceResults.multiFaceLandmarks[0];
+    let triggered = false;
+    let bestDist = 999;
+
+    for (const handLms of handResults.multiHandLandmarks) {
+      const result = isHandInHairZone(handLms, faceLms);
+      if (result.dist < bestDist) bestDist = result.dist;
+      if (result.triggered) triggered = true;
+    }
+
+    distHistory.push(bestDist);
+    if (distHistory.length > HISTORY_SIZE) distHistory.shift();
+    const smoothDist = distHistory.reduce((a, b) => a + b, 0) / distHistory.length;
+
+    distEl.textContent = smoothDist.toFixed(2);
+
+    const now = Date.now();
+    if (triggered && smoothDist < HAIR_THRESHOLD && (now - lastAlertTime) > COOLDOWN_MS) {
+      showAlert();
+      lastAlertTime = now;
+
+      const d = new Date();
+      logData.push({
+        time: d.toISOString(),
+        date: d.toLocaleDateString("he-IL"),
+        hour: d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
+        dist: bestDist.toFixed(4),
+        smooth: smoothDist.toFixed(4)
+      });
+
+      statusText.textContent = `התראה #${alertCount}`;
+      statusEl.className = "warn";
+      setTimeout(() => {
+        statusText.textContent = "פעיל";
+        statusEl.className = "ok";
+      }, 1000);
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    distEl.textContent = "-";
+    distHistory.length = 0;
+  }
+
+  requestAnimationFrame(processFrame);
+}
+
+// Download log
+window.downloadLog = function() {
+  if (!logData.length) { alert("אין נתונים עדיין"); return; }
+  let csv = "timestamp,date,hour,distance,smoothed\n";
+  logData.forEach(r => {
+    csv += `${r.time},${r.date},${r.hour},${r.dist},${r.smooth}\n`;
+  });
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `pfc_log_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.getElementById("start-btn").addEventListener("click", start);
+document.getElementById("hud").addEventListener("dblclick", () => window.downloadLog());
+</script>
+</body>
+</html>
