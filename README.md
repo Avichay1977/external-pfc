@@ -1,62 +1,51 @@
-# External PFC - Executive Function Prosthetic
+# External PFC — Hair Touch Monitor
 
-Real-time hair-touch detection system for trichotillomania awareness.
-Pure Edge AI — no cloud, no server, no data leaving the device.
+> *Between rockets and shelters, inspiration finds its way in.*
 
-## How It Works
-
-Uses MediaPipe Face Mesh + Hands to detect when a hand moves toward the hairline zone.
-3D distance calculation with pinch/pull pose recognition. Alerts only for hair area (above hairline + temples), ignores eating/drinking.
-
-## Platforms
-
-| Platform | Alert Type | How It Runs |
-|----------|-----------|-------------|
-| **Windows** | Red border flash | Silent background process, auto-starts with Windows |
-| **Android** | Haptic vibration | Pydroid 3 script, auto-restarts |
-| **iPad** | Visual + audio beep | Safari PWA, Add to Home Screen |
+Real-time Trichotillomania intervention system. Detects when a hand moves toward the hairline and interrupts the impulse before it lands. Runs locally — no cloud, no server, no data leaving the device.
 
 ---
 
 ## Installation
 
-### Windows
+### 🖥️ Windows
 
-1. Download or clone this repo
-2. Run `install_windows.bat`
-3. Done — PFC starts automatically with Windows
+1. Download [External-PFC.zip](https://github.com/Avichay1977/external-pfc/raw/master/External-PFC.zip)
+2. Extract the folder
+3. Double-click `install_windows.bat`
 
-**Requirements:** Python 3.8+, webcam
+That's it. The monitor runs silently in the background and starts automatically with Windows.
 
-### Android
+---
 
-1. Install [Pydroid 3](https://play.google.com/store/apps/details?id=ru.iiec.pydroid3) from Play Store
-2. Copy `pfc_android.py` to the device
-3. Open in Pydroid 3 and tap Run
-4. First run auto-installs dependencies
+### 📱 Android (Pydroid 3)
 
-### iPad
+1. Install [Pydroid 3](https://play.google.com/store/apps/details?id=ru.iiec.pydroid3) from Google Play
+2. Download [pfc_android.py](https://raw.githubusercontent.com/Avichay1977/external-pfc/master/pfc_android.py)
+3. Open the file in Pydroid 3 and tap **Run**
+4. On first run it installs all dependencies automatically
 
-1. Send `pfc_ipad.html` to the iPad (AirDrop / WhatsApp / Email)
+---
+
+### 🍎 iPad / iPhone (Safari)
+
+1. Download [pfc_ipad.html](https://raw.githubusercontent.com/Avichay1977/external-pfc/master/pfc_ipad.html)
 2. Open in Safari
-3. Tap Share → **Add to Home Screen**
-4. Launch from home screen — runs as full-screen app
-5. Tap "התחל" (Start) and allow camera access
+3. Tap **Share → Add to Home Screen**
+4. Open from your home screen and tap **Start**
 
 ---
 
-## CSV Logging
+## How it works
 
-All alerts are logged with timestamp, date, hour, and distance values.
-- **Windows/Android:** `pfc_log.csv` in the script folder
-- **iPad:** Double-tap the HUD bar to download CSV
-
-Use `analyze_log.py` to view hourly patterns and trends.
-
-## Auto-Update (Windows)
-
-The Windows version checks GitHub for updates on startup and applies them automatically.
+- Tracks hand and face position at 30fps using MediaPipe
+- Detects movement toward the hairline only (forehead, temples, crown)
+- Ignores eating, drinking, scratching nose
+- Recognizes pinch/grasp posture — only deliberate pulling movements trigger an alert
+- Logs every event to CSV for weekly pattern analysis
 
 ---
 
-Built with Claude Code.
+## License
+
+MIT — free to use, modify, and share.
